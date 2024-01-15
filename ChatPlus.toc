@@ -1,0 +1,12 @@
+## Interface: 100205
+
+## Title: Chat|cff40a5f7Plus|r
+## Notes: Adds extra features to the chat.
+## Author: Eyal Alon
+
+## SavedVariables: ChatPlusDB
+
+Main.lua
+
+Scripts\Copy.lua
+Scripts\Sticky.lua
