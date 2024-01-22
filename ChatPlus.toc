@@ -2,6 +2,7 @@
 
 ## Title: Chat|cff40a5f7Plus|r
 ## Notes: Adds extra features to the chat.
+## IconTexture: Interface\AddOns\ChatPlus\Logo
 ## Author: Eyal Alon
 
 ## SavedVariables: ChatPlusDB
