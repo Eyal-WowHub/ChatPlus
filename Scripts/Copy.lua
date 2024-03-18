@@ -74,15 +74,23 @@ do
 		return msg
 	end
 
-	local function SetupCopyButton(chatFrame)
-		local copyButton = CreateFrame("Button", nil, chatFrame, "UIPanelButtonTemplate")
+	local function SetupButtons(chatFrame)
+        local anchorFrame = CreateFrame("Frame", nil, chatFrame)
+        anchorFrame:SetPoint("TOPRIGHT")
+        anchorFrame:SetSize(140, 20)
+        anchorFrame:Hide()
+
+		local copyButton = CreateFrame("Button", nil, anchorFrame, "UIPanelButtonTemplate")
 		copyButton:SetPoint("TOPRIGHT")
 		copyButton:SetSize(70, 20)
 		copyButton:SetText("Copy")
+        
+        local clearButton = CreateFrame("Button", nil, anchorFrame, "UIPanelButtonTemplate")
+		clearButton:SetPoint("TOPRIGHT", copyButton, "TOPLEFT")
+		clearButton:SetSize(70, 20)
+		clearButton:SetText("Clear")
 
 		copyButton:SetScript("OnClick", function(self)
-			self:Hide()
-
 			editBox:SetText("")
 
 			if not chatFrame.lines then
@@ -103,21 +111,38 @@ do
 			
 			prevText = table.concat(lines, "\n")
 
+            editBox:SetText(prevText)
 			editFrame:Show()
 		end)
 
-		copyButton:Hide()
-		copyButton:SetScript("OnEnter", function() copyButton:Show() end)
-		copyButton:SetScript("OnLeave", function() copyButton:Hide() end)
+        copyButton:SetScript("OnLeave", function(self)
+            anchorFrame:Hide()
+        end)
 
-		chatFrame:SetScript("OnEnter", copyButton:GetScript("OnEnter"))
-		chatFrame:SetScript("OnLeave", copyButton:GetScript("OnLeave"))
+        clearButton:SetScript("OnClick", function(self)
+			chatFrame:Clear()
+		end)
+
+        clearButton:SetScript("OnLeave", function(self)
+            anchorFrame:Hide()
+        end)
+
+		chatFrame:SetScript("OnEnter", function(self)
+            anchorFrame:Show()
+        end)
+
+		chatFrame:SetScript("OnLeave", function(self)
+            local obj = GetMouseFocus()
+            if obj and obj:GetObjectType() ~= "Button" then
+                anchorFrame:Hide()
+            end
+        end)
 	end
 
 	for i = 1, NUM_CHAT_WINDOWS do
 		local chatFrame = _G["ChatFrame" .. i]
 		if chatFrame then
-			SetupCopyButton(chatFrame)
+			SetupButtons(chatFrame)
 		end
 	end
 end
