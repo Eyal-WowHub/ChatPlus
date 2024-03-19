@@ -99,7 +99,7 @@ do
 
 	local function SetupButtons(chatFrame)
         local anchorFrame = CreateFrame("Frame", nil, chatFrame)
-        anchorFrame:SetPoint("TOPRIGHT", 0, 0)
+        anchorFrame:SetPoint("TOPRIGHT", -10, 0)
         anchorFrame:SetSize(200, 28)
         anchorFrame:Show()
 
@@ -134,28 +134,9 @@ do
 			editFrame:Show()
 		end)
 
-        copyButton:SetScript("OnLeave", function()
-            anchorFrame:Hide()
-        end)
-
         clearButton:SetScript("OnClick", function()
 			chatFrame:Clear()
 		end)
-
-        clearButton:SetScript("OnLeave", function()
-            anchorFrame:Hide()
-        end)
-
-		chatFrame:SetScript("OnEnter", function()
-            anchorFrame:Show()
-        end)
-
-		chatFrame:SetScript("OnLeave", function()
-            local obj = GetMouseFocus()
-            if obj and obj == chatFrame then
-                anchorFrame:Hide()
-            end
-        end)
 	end
 
 	for i = 1, NUM_CHAT_WINDOWS do
