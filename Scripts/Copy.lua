@@ -1,3 +1,8 @@
+---@diagnostic disable: undefined-field
+local tconcat = table.concat
+local tinsert = table.insert
+local twipe = table.wipe
+
 local editFrame = CreateFrame("ScrollFrame", nil, UIParent, "InputScrollFrameTemplate")
 editFrame:SetPoint("CENTER")
 editFrame:SetSize(600, 300)
@@ -11,16 +16,22 @@ editBox:EnableMouse(true)
 editBox:SetAutoFocus(false)
 editBox:SetFontObject(ChatFontNormal)
 editBox:SetWidth(editFrame:GetWidth())
-editBox:SetTextInsets(20, 35, 20, 20)
+editBox:SetTextInsets(5, 20, 30, 20)
 editBox:SetAllPoints()
 
 local closeButton = CreateFrame("Button", nil, editFrame, "UIPanelCloseButton")
 closeButton:SetFrameStrata("HIGH")
+closeButton:SetPoint("TOPRIGHT", -20, -5)
 closeButton:SetScript("OnClick", function(self)
 	editBox:SetText("")
 	editBox:ClearFocus()
 	editFrame:Hide()
 end)
+
+local newestOnTopButton = CreateFrame("CheckButton", nil, editFrame, "UICheckButtonTemplate")
+newestOnTopButton:SetFrameStrata("HIGH")
+newestOnTopButton:SetPoint("TOPLEFT")
+newestOnTopButton.Text:SetText("Newest On Top")
 
 editBox:SetScript("OnEscapePressed", function(self)
 	closeButton:Click()
@@ -32,11 +43,6 @@ editBox:SetScript("OnTextChanged", function(self)
 	self:SetCursorPosition(0)
 	self:SetFocus()
 	self:HighlightText()
-	if editFrame.ScrollBar:IsShown() then
-		closeButton:SetPoint("TOPRIGHT", -15, 0)
-	else
-		closeButton:SetPoint("TOPRIGHT")
-	end
 end)
 
 do
@@ -74,20 +80,37 @@ do
 		return msg
 	end
 
+    local function IterableMessages(chatFrame, reverse)
+        local n = chatFrame:GetNumMessages()
+        local i, index = 0, nil
+        return function()
+            i = i + 1
+            while i <= n do
+                index = reverse and n - i + 1 or i
+                local msg = chatFrame:GetMessageInfo(index)
+                msg = Unescape(msg)
+                if msg ~= "" then
+                    return msg
+                end
+                i = i + 1
+            end
+        end
+    end
+
 	local function SetupButtons(chatFrame)
         local anchorFrame = CreateFrame("Frame", nil, chatFrame)
-        anchorFrame:SetPoint("TOPRIGHT")
-        anchorFrame:SetSize(140, 20)
-        anchorFrame:Hide()
+        anchorFrame:SetPoint("TOPRIGHT", 0, 0)
+        anchorFrame:SetSize(200, 28)
+        anchorFrame:Show()
 
 		local copyButton = CreateFrame("Button", nil, anchorFrame, "UIPanelButtonTemplate")
 		copyButton:SetPoint("TOPRIGHT")
-		copyButton:SetSize(70, 20)
+		copyButton:SetSize(70, 28)
 		copyButton:SetText("Copy")
         
         local clearButton = CreateFrame("Button", nil, anchorFrame, "UIPanelButtonTemplate")
 		clearButton:SetPoint("TOPRIGHT", copyButton, "TOPLEFT")
-		clearButton:SetSize(70, 20)
+		clearButton:SetSize(70, 28)
 		clearButton:SetText("Clear")
 
 		copyButton:SetScript("OnClick", function(self)
@@ -96,44 +119,40 @@ do
 			if not chatFrame.lines then
 				chatFrame.lines = {}
 			else
-				table.wipe(chatFrame.lines)
+				twipe(chatFrame.lines)
 			end
 
 			local lines = chatFrame.lines
 
-			for index = 1, chatFrame:GetNumMessages() do
-				local msg = chatFrame:GetMessageInfo(index)
-				msg = Unescape(msg)
-				if msg ~= "" then
-					tinsert(lines, 1, msg)
-				end
-			end
+            for msg in IterableMessages(chatFrame, newestOnTopButton:GetChecked()) do
+                tinsert(lines, msg)
+            end
 			
-			prevText = table.concat(lines, "\n")
+			prevText = tconcat(lines, "\n")
 
             editBox:SetText(prevText)
 			editFrame:Show()
 		end)
 
-        copyButton:SetScript("OnLeave", function(self)
+        copyButton:SetScript("OnLeave", function()
             anchorFrame:Hide()
         end)
 
-        clearButton:SetScript("OnClick", function(self)
+        clearButton:SetScript("OnClick", function()
 			chatFrame:Clear()
 		end)
 
-        clearButton:SetScript("OnLeave", function(self)
+        clearButton:SetScript("OnLeave", function()
             anchorFrame:Hide()
         end)
 
-		chatFrame:SetScript("OnEnter", function(self)
+		chatFrame:SetScript("OnEnter", function()
             anchorFrame:Show()
         end)
 
-		chatFrame:SetScript("OnLeave", function(self)
+		chatFrame:SetScript("OnLeave", function()
             local obj = GetMouseFocus()
-            if obj and obj:GetObjectType() ~= "Button" then
+            if obj and obj == chatFrame then
                 anchorFrame:Hide()
             end
         end)
