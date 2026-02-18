@@ -1,4 +1,4 @@
-## Interface: 110005
+## Interface: 120001
 
 ## Title: Chat|cff40a5f7Plus|r
 ## Notes: Adds extra features to the chat.
