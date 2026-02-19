@@ -46,53 +46,82 @@ editBox:SetScript("OnTextChanged", function(self)
 end)
 
 do
-	-- https://wowwiki.fandom.com/wiki/UI_escape_sequences
-	
-	local patterns = {
-		"{.-}",                             -- Icons
-		"|T.-|t",                           -- Textures
-		"|c%x%x%x%x%x%x%x%x(.-)|r",         -- Colors
-		"|c%x%x%x%x%x%x%x%x|H.-|h(.-)|h",   -- Links
-		"|H.-|h(.-)|h",                     -- Links
-		"|K.-|k",                           -- Battle.Net
-		-- review: Might want to escape pipes only in debug mode but we'll see.
-		"\124"                              -- Pipe
-	}
+	-- https://warcraft.wiki.gg/wiki/UI_escape_sequences
 
-	local replacements = {
-		"",                                 -- Icons
-		"",                                 -- Textures
-		"%1",                               -- Colors
-		"%1",                               -- Links
-		"%1",                               -- Links
-		"BNPlayer",                         -- Battle.Net
-		"%0%0"                              -- Pipe
-	}
+	local issecretvalue = issecretvalue
+
+	local function IsKstring(msg)
+		local b1, b2 = msg:byte(1, 2)
+		return b1 == 124 and b2 == 75  -- starts with |K
+	end
 
 	local function Unescape(msg)
-		for index = 1, #patterns do
-			local pattern = patterns[index]
-			local replacement = replacements[index]
-			msg = msg:gsub(pattern, replacement)
+		-- Secret strings (12.0.0+) cannot be indexed; skip pattern stripping.
+		-- string.format %s converts secrets to their display representation.
+		if issecretvalue and issecretvalue(msg) then
+			return string.format("%s", msg)
 		end
+
+		-- Kstrings (|K...|k) are opaque tokens that only WoW's rendering engine
+		-- can decode. EditBox:SetText() silently drops them, so we must skip them.
+		-- This affects combat log messages since 12.0.0.
+		if IsKstring(msg) then
+			return nil
+		end
+
+		-- Remove textures, icons, and atlases
+		msg = msg:gsub("{.-}", "")
+		msg = msg:gsub("|T.-|t", "")
+		msg = msg:gsub("|A.-|a", "")
+
+		-- Remove embedded Kstrings (BNet names within larger messages)
+		msg = msg:gsub("|K.-|k", "")
+
+		-- Extract link display text: |Hdata|htext|h → text
+		msg = msg:gsub("|H.-|h(.-)|h", "%1")
+
+		-- Strip color codes separately for robust nested/sequential handling
+		msg = msg:gsub("|cn[^:]+:", "")             -- Named colors (10.0+)
+		msg = msg:gsub("|c%x%x%x%x%x%x%x%x", "")  -- Hex colors
+		msg = msg:gsub("|r", "")                    -- Color reset
+
+		-- Other escape sequences
+		msg = msg:gsub("|W(.-)|w", "%1")            -- Word wrap hints
+		msg = msg:gsub("|n", "\n")                  -- Newlines
+
+		-- Clean up any remaining escape sequences
+		msg = msg:gsub("|", "")
+
 		msg = msg:trim()
-		msg = msg:trim("")
 		return msg
 	end
+
+	local MESSAGE_KSTRING = "Combat log messages cannot be copied (Blizzard Kstring restriction since 12.0.0)."
 
     local function IterableMessages(chatFrame, reverse)
         local n = chatFrame:GetNumMessages()
         local i, index = 0, nil
+		local hasKstrings = false
         return function()
             i = i + 1
             while i <= n do
                 index = reverse and n - i + 1 or i
                 local msg = chatFrame:GetMessageInfo(index)
-                msg = Unescape(msg)
-                if msg ~= "" then
-                    return msg
+
+                if msg then
+                    msg = Unescape(msg)
+
+					if msg == nil then
+						hasKstrings = true
+					elseif msg ~= "" then
+                        return msg
+                    end
                 end
                 i = i + 1
+			end
+			if hasKstrings then
+				hasKstrings = false
+				return MESSAGE_KSTRING
             end
         end
     end
