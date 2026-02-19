@@ -50,23 +50,11 @@ do
 
 	local issecretvalue = issecretvalue
 
-	local function IsKstring(msg)
-		local b1, b2 = msg:byte(1, 2)
-		return b1 == 124 and b2 == 75  -- starts with |K
-	end
-
 	local function Unescape(msg)
 		-- Secret strings (12.0.0+) cannot be indexed; skip pattern stripping.
 		-- string.format %s converts secrets to their display representation.
 		if issecretvalue and issecretvalue(msg) then
 			return string.format("%s", msg)
-		end
-
-		-- Kstrings (|K...|k) are opaque tokens that only WoW's rendering engine
-		-- can decode. EditBox:SetText() silently drops them, so we must skip them.
-		-- This affects combat log messages since 12.0.0.
-		if IsKstring(msg) then
-			return nil
 		end
 
 		-- Remove textures, icons, and atlases
@@ -96,12 +84,9 @@ do
 		return msg
 	end
 
-	local MESSAGE_KSTRING = "Combat log messages cannot be copied (Blizzard Kstring restriction since 12.0.0)."
-
     local function IterableMessages(chatFrame, reverse)
         local n = chatFrame:GetNumMessages()
         local i, index = 0, nil
-		local hasKstrings = false
         return function()
             i = i + 1
             while i <= n do
@@ -111,67 +96,74 @@ do
                 if msg then
                     msg = Unescape(msg)
 
-					if msg == nil then
-						hasKstrings = true
-					elseif msg ~= "" then
+					if msg and msg ~= "" then
                         return msg
                     end
                 end
                 i = i + 1
-			end
-			if hasKstrings then
-				hasKstrings = false
-				return MESSAGE_KSTRING
             end
         end
     end
 
-	local function SetupButtons(chatFrame)
+	local function SetupButtons(chatFrame, isCombatLog)
         local anchorFrame = CreateFrame("Frame", nil, chatFrame)
         anchorFrame:SetPoint("TOPRIGHT", -10, 0)
         anchorFrame:SetSize(200, 28)
         anchorFrame:Show()
 
-		local copyButton = CreateFrame("Button", nil, anchorFrame, "UIPanelButtonTemplate")
-		copyButton:SetPoint("TOPRIGHT")
-		copyButton:SetSize(70, 28)
-		copyButton:SetText("Copy")
-        
+		local lastButton
+
+		if not isCombatLog then
+			local copyButton = CreateFrame("Button", nil, anchorFrame, "UIPanelButtonTemplate")
+			copyButton:SetPoint("TOPRIGHT")
+			copyButton:SetSize(70, 28)
+			copyButton:SetText("Copy")
+
+			copyButton:SetScript("OnClick", function(self)
+				editBox:SetText("")
+
+				if not chatFrame.lines then
+					chatFrame.lines = {}
+				else
+					twipe(chatFrame.lines)
+				end
+
+				local lines = chatFrame.lines
+
+				for msg in IterableMessages(chatFrame, newestOnTopButton:GetChecked()) do
+					tinsert(lines, msg)
+				end
+
+				prevText = tconcat(lines, "\n")
+
+				editBox:SetText(prevText)
+				editFrame:Show()
+			end)
+
+			lastButton = copyButton
+		end
+
         local clearButton = CreateFrame("Button", nil, anchorFrame, "UIPanelButtonTemplate")
-		clearButton:SetPoint("TOPRIGHT", copyButton, "TOPLEFT")
 		clearButton:SetSize(70, 28)
 		clearButton:SetText("Clear")
 
-		copyButton:SetScript("OnClick", function(self)
-			editBox:SetText("")
-
-			if not chatFrame.lines then
-				chatFrame.lines = {}
-			else
-				twipe(chatFrame.lines)
-			end
-
-			local lines = chatFrame.lines
-
-            for msg in IterableMessages(chatFrame, newestOnTopButton:GetChecked()) do
-                tinsert(lines, msg)
-            end
-			
-			prevText = tconcat(lines, "\n")
-
-            editBox:SetText(prevText)
-			editFrame:Show()
-		end)
+		if lastButton then
+			clearButton:SetPoint("TOPRIGHT", lastButton, "TOPLEFT")
+		else
+			clearButton:SetPoint("TOPRIGHT")
+		end
 
         clearButton:SetScript("OnClick", function()
 			chatFrame:Clear()
 		end)
 	end
 
+	local combatLog = COMBATLOG or ChatFrame2
+
 	for i = 1, NUM_CHAT_WINDOWS do
 		local chatFrame = _G["ChatFrame" .. i]
 		if chatFrame then
-			SetupButtons(chatFrame)
+			SetupButtons(chatFrame, chatFrame == combatLog)
 		end
 	end
 end
